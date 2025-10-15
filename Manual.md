@@ -94,3 +94,100 @@ Recorre los datos de marcajes cargados, identifica a los empleados con faltas o 
    - No marcaron entrada ni salida (ausencia completa).  
    - Solo marcaron entrada o salida (marcaje incompleto).  
 5. Genera un archivo `.txt` por cada caso con nombre:
+6. Guarda los informes dentro de la carpeta `Marcajes`.
+7. Muestra un mensaje final indicando cuántos informes se generaron.
+
+---
+
+## 🧾 5. Ejemplo de informe generado
+
+Ejemplo de archivo `Maria_Meneses_18-10-2025.txt`:
+
+
+---
+
+## 🧰 6. Instalación y ejecución paso a paso
+
+1. Copia el archivo **Proyecto_Practicas_Iniciales_2014004445.xlsm** en tu equipo.  
+2. Abre Excel y habilita las macros:
+   - Ve a: **Archivo → Opciones → Centro de confianza → Configuración del Centro de confianza → Configuración de macros**.  
+   - Selecciona:  
+     ✅ *Habilitar todas las macros*  
+     ✅ *Confiar en el acceso al modelo de objetos de VBA*
+3. Abre el archivo `.xlsm`.  
+4. Si Excel muestra una barra amarilla con el botón **Habilitar contenido**, haz clic en él.  
+5. En la hoja de trabajo:
+   - Pulsa **Cargar archivo** → selecciona tu archivo de marcajes.  
+   - Luego pulsa **Crear informe** → el sistema generará los reportes en el escritorio.  
+6. Verifica que se haya creado la carpeta **Marcajes** y que los archivos `.txt` estén dentro.
+
+---
+
+## 🧩 7. Funcionamiento interno
+
+- **Control de fecha:** actualmente analiza todos los registros disponibles en la hoja, sin filtrar por fecha.  
+  En futuras versiones se incluirá el filtrado automático por “día anterior”.
+- **Generación automática:** los informes se crean con `Open For Output`, sin requerir intervención.  
+- **Control de errores:** incluye validaciones para:
+  - Falta de encabezados.  
+  - Celdas vacías.  
+  - Rutas inexistentes (crea carpetas si no están).  
+- **Independencia:** el macro no necesita conexión a Outlook o internet en esta etapa.
+
+---
+
+## ⚠️ 8. Posibles errores y soluciones
+
+| Error o mensaje | Causa probable | Solución |
+|-----------------|----------------|-----------|
+| Error 76: No se encontró la ruta de acceso | La carpeta del escritorio tiene otro nombre (Escritorio vs Desktop). | Cambiar la ruta en el código: `Environ("USERPROFILE") & "\Escritorio\Marcajes"`. |
+| No se encontró el encabezado "Nombre" | Encabezados movidos o cambiados. | Verificar que “Nombre” esté en `D13`. |
+| No se generaron informes | No hay empleados con marcajes incompletos. | Verificar las columnas “Marc-Ent” y “Marc-Sal”. |
+| Error de macros deshabilitadas | Excel bloquea VBA. | Activar macros en el Centro de confianza. |
+| Archivo bloqueado al abrir | El archivo de marcajes es antiguo. | Guardar una copia como `.xlsx`. |
+
+---
+
+## 🚀 9. Próximas ampliaciones
+
+El proyecto está planificado para evolucionar en varias etapas:
+
+1. **Etapa actual (v1.0)**  
+   - Lectura de archivo externo  
+   - Análisis de marcajes  
+   - Generación de informes `.txt`
+
+2. **Etapa siguiente (v2.0)**  
+   - **Envío automático de correos** a los empleados detectados con ausencias.  
+     - Integración con Outlook mediante `CreateObject("Outlook.Application")`.  
+     - Envío del archivo generado como adjunto.  
+     - Registro de envíos exitosos.
+
+3. **Etapa avanzada (v3.0)**  
+   - Exportación en formato **PDF o Word (.docx)**.  
+   - Panel de control o formulario gráfico con calendario.  
+   - Registro histórico consolidado de ausencias.  
+   - Configuración personalizada de destinatarios y copia oculta (CC/BCC).
+
+---
+
+## 🧠 10. Notas del autor
+
+- Este sistema fue desarrollado como parte de las **Prácticas Iniciales** de la carrera de **Ingeniería en Ciencias y Sistemas (USAC)**.  
+- El diseño busca ser **ligero, compatible y autónomo**, evitando dependencias externas.  
+- La documentación se ha elaborado cuidadosamente para que cualquier técnico o encargado pueda **instalar, ejecutar y diagnosticar errores** sin conocimientos avanzados de programación.  
+- Se recomienda mantener una **copia de respaldo** del archivo antes de cada prueba y registrar los resultados en un documento de control.
+
+---
+
+## 📅 Historial de versiones
+
+| Versión | Fecha | Descripción |
+|----------|--------|-------------|
+| 1.0 | 15/10/2025 | Versión inicial funcional. Análisis y generación automática de informes. |
+| 1.1 (planificada) | 10/2025 | Integración con Outlook para envío de correos. |
+
+---
+
+✍️ **Documento redactado manualmente y revisado para uso institucional.**
+
