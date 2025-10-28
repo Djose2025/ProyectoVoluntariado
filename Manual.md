@@ -1,193 +1,291 @@
-# 🧭 Manual Técnico del Proyecto de Análisis de Marcajes  
-**Proyecto de Prácticas Iniciales - USAC 2025**  
-Autor: **[Daniel José Colindres Fuentes / Carné 2014004445]**  
-Versión: **1.0 (Etapa de Prueba y Validación en Equipo Destinado)**  
-Fecha: **Octubre 2025**
+# Manual Técnico — Automatización de Registro de Asistencia (Excel VBA)
+
+Última actualización: 2025-10-28  
+Autor: Daniel José Colindres Fuentes
+Registro academico: 201404445
+
+## Resumen
+Este manual describe la macro VBA "Asistencia_Gmail_CDO" que:
+- importa marcajes desde un archivo Excel,
+- normaliza y busca correos en una hoja `Empleados`,
+- detecta omisiones (entrada/salida/ausencia) por jornada,
+- genera un informe TXT con el detalle,
+- envía correos automáticos por Gmail (CDO) usando App Password (opcional).
+
+Se diseñó para Excel 2007 en Windows 8/10 y pretende ser fácil de auditar y mantener.
 
 ---
 
-## 🧱 1. Descripción General
-
-Este proyecto tiene como objetivo **automatizar la verificación diaria de marcajes de asistencia** del personal de una institución.  
-El sistema analiza los datos de marcaje del **día anterior**, identifica a los empleados con **ausencias o marcajes incompletos**, y genera **informes individuales** que posteriormente podrán ser enviados por correo electrónico.
-
-Actualmente, esta versión:
-- Genera los informes de manera **automática** en formato `.txt`.
-- Crea la carpeta de salida **Marcajes** en el **escritorio del usuario**.
-- Está diseñada para funcionar en **equipos antiguos con Windows 8** y **Microsoft Excel 2010 o posterior**.
-- No requiere conexión a internet ni instalación adicional.
-
-> 🔧 En versiones futuras se agregará el módulo de **envío automático de correos**, una vez verificada la compatibilidad con el equipo de destino (configuración de Outlook).
-
----
-
-## 💻 2. Requisitos del Sistema
-
-| Requisito | Especificación recomendada |
-|------------|----------------------------|
-| **Sistema operativo** | Windows 8, 8.1 o superior (64 bits preferiblemente) |
-| **Microsoft Excel** | Versión 2010, 2013, 2016 o posterior |
-| **Extensión del archivo** | `.xlsm` (Libro habilitado para macros) |
-| **Procesador mínimo** | Intel Core i3 o i5 |
-| **Permisos de usuario** | Permitir macros y acceso al sistema de archivos |
-| **Software opcional** | Outlook configurado (para versión futura de envío automático) |
+## Contenido del manual
+1. Requisitos previos  
+2. Archivos / Hojas esperadas  
+3. Instalación del módulo VBA  
+4. Configuración principal (constantes)  
+5. Descripción técnica del código (módulos y funciones)  
+6. Flujo de ejecución paso a paso  
+7. Plantilla de asunto y cuerpo del correo  
+8. Pruebas y modo seguro (DryRun)  
+9. Gestión de credenciales (App Password)  
+10. Registro e informe (auditoría)  
+11. Resolución de problemas comunes  
+12. Buenas prácticas y seguridad  
+13. Extensiones y mejoras futuras
 
 ---
 
-## 📄 3. Estructura del Archivo de Marcajes
-
-La hoja principal del proyecto tiene la siguiente estructura:
-
-| Columna | Encabezado | Descripción |
-|----------|-------------|-------------|
-| D13 | Nombre | Nombre completo del empleado |
-| E13 | Día | Fecha del registro del marcaje |
-| F13 | HoraEnt | Hora programada de entrada |
-| G13 | HoraSal | Hora programada de salida |
-| H13 | Marc-Ent | Hora real de entrada |
-| I13 | Marc-Sal | Hora real de salida |
-
-Los datos inician en la fila **14**.  
-El sistema analiza todos los registros a partir de esa fila.
-
-> ⚠️ Es fundamental que los encabezados estén **exactamente escritos** como se muestran arriba.  
-> Si se modifican, el análisis fallará.
+## 1. Requisitos previos
+- Microsoft Excel 2007 (habilitar macros)  
+- Windows 8 o Windows 10 (mejor compatibilidad TLS para CDO)  
+- Cuenta Gmail para envío (opcional): activar 2-Step Verification y crear App Password (si se usará envío automático).  
+- Permisos para ejecutar macros y acceso a Internet desde la máquina que ejecuta el envío SMTP.  
 
 ---
 
-## ⚙️ 4. Macros Principales
+## 2. Archivos / Hojas esperadas
+Libro (Workbook) donde se instala la macro, con dos hojas:
 
-El archivo contiene **dos macros principales**:
+- Hoja: `Hoja1`  
+  - Encabezados (fila 13): D13..I13 -> `Nombre`, `Dia`, `HoraEnt`, `HoraSal`, `Marc-Ent`, `Marc-Sal`  
+  - Datos desde D14 hacia abajo (cada fila = 1 jornada).
 
-### 🔹 A. Subir archivo de marcajes
+- Hoja: `Empleados`  
+  - Encabezados (fila 4): D4..F4 -> `Nombre completo`, `Área`, `Correo`  
+  - Datos desde D5 hacia abajo (columna D = nombre, F = correo).
 
-**Nombre interno:** `Sub CargarArchivoMarcajes()`
-
-#### Función:
-Permite cargar automáticamente un archivo externo de Excel que contenga los registros de marcaje del día anterior o de cualquier fecha.
-
-#### Flujo:
-1. Muestra una ventana para seleccionar el archivo (`.xls`, `.xlsx`, o `.xlsm`).
-2. Abre el archivo seleccionado y copia los datos.
-3. Pega los registros en la hoja principal, respetando la estructura.
-4. Verifica los encabezados antes de copiar.
-5. Muestra un mensaje confirmando la carga exitosa.
-
-#### Posibles mensajes:
-- “No se encontró el encabezado ‘Nombre’” → Los encabezados no coinciden.  
-- “Estás intentando abrir un tipo de archivo bloqueado” → El archivo es antiguo; debe guardarse como `.xlsx`.
+Nota: Si tus encabezados están en otra posición, cambiar las constantes en la sección de configuración del módulo.
 
 ---
 
-### 🔹 B. Analizar marcajes y generar informes
+## 3. Instalación del módulo VBA
+1. Abrir el libro en Excel y habilitar macros (guardar como `.xlsm`).  
+2. ALT + F11 → Insertar → Módulo.  
+3. Copiar y pegar el módulo VBA proporcionado (archivo `Asistencia_Gmail_CDO_Final.bas`).  
+4. Guardar el libro.
 
-**Nombre interno:** `Sub AnalizarMarcajes_Auto_Mapeado()`
-
-#### Función:
-Recorre los datos de marcajes cargados, identifica a los empleados con faltas o marcajes incompletos, y genera **un informe individual en texto (.txt)** con los detalles del caso.
-
-#### Flujo de trabajo:
-1. Verifica la presencia de encabezados en la fila 13.  
-2. Crea una carpeta en el escritorio llamada **Marcajes** (si no existe).  
-3. Recorre todos los registros desde la fila 14 hasta la última.  
-4. Detecta empleados que:
-   - No marcaron entrada ni salida (ausencia completa).  
-   - Solo marcaron entrada o salida (marcaje incompleto).  
-5. Genera un archivo `.txt` por cada caso con nombre:
-6. Guarda los informes dentro de la carpeta `Marcajes`.
-7. Muestra un mensaje final indicando cuántos informes se generaron.
+Recomendación: crear una copia de seguridad del libro antes de modificar macros.
 
 ---
 
-## 🧾 5. Ejemplo de informe generado
+## 4. Configuración principal (constantes)
+En la parte superior del módulo hay una sección `CONFIGURACIÓN` con constantes para ajustar:
 
-Ejemplo de archivo `Maria_Meneses_18-10-2025.txt`:
+- `SHEET_MARCAJES` — nombre de la hoja de marcajes (por defecto `"Hoja1"`).  
+- `ROW_HEADERS_MAR`, `START_ROW_MAR` — fila de encabezado y primera fila de datos (por defecto 13 y 14).  
+- `SHEET_EMPLEADOS`, `ROW_HEADERS_EMP`, `START_ROW_EMP` — hoja y filas para `Empleados` (por defecto `"Empleados"`, 4 y 5).  
+- Columnas (números): `COL_MAR_NOMBRE`, `COL_MAR_DIA`, `COL_MAR_HORAENT`, `COL_MAR_HORASAL`, `COL_MAR_MARC_ENT`, `COL_MAR_MARC_SAL`.  
+- Columnas de `Empleados`: `COL_EMP_NOMBRE`, `COL_EMP_AREA`, `COL_EMP_CORREO`.  
+- Modo de envío: `SendMode = "SMTP_CDO"` (usar Gmail) o `"REPORT_ONLY"` (solo informe).  
+- SMTP / Gmail:
+  - `SMTP_SERVER = "smtp.gmail.com"`
+  - `SMTP_PORT = 465`
+  - `SMTP_USE_SSL = True`
+  - `SMTP_USER = "tuCuenta@gmail.com"` (cambiar por la cuenta remitente)
+  - `EMAIL_FROM = "Secretaría Académica <tuCuenta@gmail.com>"`
 
+- `DryRun` (True/False): True = simula (no envía).  
+- `MostrarMensajes`: controla MsgBox final.
 
----
-
-## 🧰 6. Instalación y ejecución paso a paso
-
-1. Copia el archivo **Proyecto_Practicas_Iniciales_2014004445.xlsm** en tu equipo.  
-2. Abre Excel y habilita las macros:
-   - Ve a: **Archivo → Opciones → Centro de confianza → Configuración del Centro de confianza → Configuración de macros**.  
-   - Selecciona:  
-     ✅ *Habilitar todas las macros*  
-     ✅ *Confiar en el acceso al modelo de objetos de VBA*
-3. Abre el archivo `.xlsm`.  
-4. Si Excel muestra una barra amarilla con el botón **Habilitar contenido**, haz clic en él.  
-5. En la hoja de trabajo:
-   - Pulsa **Cargar archivo** → selecciona tu archivo de marcajes.  
-   - Luego pulsa **Crear informe** → el sistema generará los reportes en el escritorio.  
-6. Verifica que se haya creado la carpeta **Marcajes** y que los archivos `.txt` estén dentro.
-
----
-
-## 🧩 7. Funcionamiento interno
-
-- **Control de fecha:** actualmente analiza todos los registros disponibles en la hoja, sin filtrar por fecha.  
-  En futuras versiones se incluirá el filtrado automático por “día anterior”.
-- **Generación automática:** los informes se crean con `Open For Output`, sin requerir intervención.  
-- **Control de errores:** incluye validaciones para:
-  - Falta de encabezados.  
-  - Celdas vacías.  
-  - Rutas inexistentes (crea carpetas si no están).  
-- **Independencia:** el macro no necesita conexión a Outlook o internet en esta etapa.
+Cambiar únicamente estas constantes según su entorno.
 
 ---
 
-## ⚠️ 8. Posibles errores y soluciones
+## 5. Descripción técnica del código (funciones y módulos)
+El módulo está organizado y documentado. Resumen por secciones:
 
-| Error o mensaje | Causa probable | Solución |
-|-----------------|----------------|-----------|
-| Error 76: No se encontró la ruta de acceso | La carpeta del escritorio tiene otro nombre (Escritorio vs Desktop). | Cambiar la ruta en el código: `Environ("USERPROFILE") & "\Escritorio\Marcajes"`. |
-| No se encontró el encabezado "Nombre" | Encabezados movidos o cambiados. | Verificar que “Nombre” esté en `D13`. |
-| No se generaron informes | No hay empleados con marcajes incompletos. | Verificar las columnas “Marc-Ent” y “Marc-Sal”. |
-| Error de macros deshabilitadas | Excel bloquea VBA. | Activar macros en el Centro de confianza. |
-| Archivo bloqueado al abrir | El archivo de marcajes es antiguo. | Guardar una copia como `.xlsx`. |
+### Helpers / Normalización
+- `NormalizeName(s As String) As String`  
+  Normaliza nombres: trim, lowercase, elimina diacríticos, quita puntuación y colapsa espacios. Permite emparejar nombres sin tildes (archivo marcajes) con nombres con acentos (Empleados).
+
+- `RemoveDiacritics(s As String) As String`  
+  Reemplaza caracteres acentuados por su equivalente sin tilde (á→a, ñ→n, etc.)
+
+- `DateToSpanishLong(d As Variant) As String`  
+  Devuelve la fecha en formato "08 de junio de 2025" para incluir en cuerpo del correo.
+
+### Carga de empleados
+- `CargarEmpleadosEnDicts(wsEmp As Worksheet, dictEmail As Object, dictName As Object)`  
+  Lee la hoja `Empleados` y crea dos diccionarios:
+  - `dictEmail(claveNorm) = correo`
+  - `dictName(claveNorm) = nombreOriginal`
+  donde `claveNorm = NormalizeName(nombre)`.
+
+### Matching parcial
+- `FindBestMatchEmail(nameNorm As String, dictEmail As Object, dictName As Object, ByRef bestNameOut As String, ByRef bestScoreOut As Long) As String`  
+  Si no hay match exacto, intenta encontrar el mejor match por tokens (palabras) y devuelve el email si la coincidencia supera un umbral (al menos 2 tokens o la mitad de tokens). También devuelve el `bestNameOut` y `bestScoreOut`.
+
+### Construcción de asunto y cuerpo
+- `BuildSubject(diaVal As Variant) As String`  
+  Genera el asunto solicitado:  
+  `Recordatorio y Solicitud de Regularización de Marcaje de Asistencia - Jornada del dd/mm/yyyy`
+
+- `BuildBody(nombre, jornadaLabel, diaVal, horaEnt, horaSal, marcEnt, marcSal, estadoDetectado) As String`  
+  Crea el cuerpo del correo en español con la plantilla solicitada, incluyendo:
+  - Saludo personalizado
+  - Jornada y fecha (fecha larga)
+  - Detalle de entradas/salidas (con "[Ausente]" cuando falta)
+  - Estado detectado con texto legible
+  - Solicitud de regularización y despedida
+
+### Envío SMTP (Gmail / CDO)
+- `EnviarPorSMTP_CDO_Gmail(dest, subj, body, smtpPass) As String`  
+  Usa `CDO.Message` y `CDO.Configuration` para enviar por SMTP. Requiere `smtpPass` (App Password). En `DryRun=True` no envía y retorna "DryRun - simulación (SMTP)".
+
+### Análisis y generación de informe
+- `AnalizarMarcajes_GenerarInforme(wsMarc, wsEmp, mode, smtpPass)`  
+  Flujo principal:
+  - Carga `Empleados` en diccionarios normalizados.
+  - Recorre `Hoja1` desde `START_ROW_MAR`.
+  - Cuenta jornadas por (nombre + día) para etiquetar "Jornada 1", "Jornada 2".
+  - Determina estado: `OK`, `Falta: Entrada`, `Falta: Salida`, `Ausencia`.
+  - Busca correo: exacto o sugerido (token matching).
+  - Construye `asunto` y `cuerpo`.
+  - Envía (según `mode`) o solo registra (REPORT_ONLY).
+  - Genera un archivo `Informe_Marcajes_YYYYMMDD_HHMMSS.txt` con columnas:
+    ```
+    Nombre | Dia | Jornada | HorarioEsperado | Marc-Ent | Marc-Sal | Estado | EmailUsado | TipoMatch | EnvioResultado
+    ```
+
+### Punto de entrada
+- `AnalizarMarcajes_Principal()`:
+  - Pide App Password (InputBox) si `SendMode = "SMTP_CDO"`.
+  - Llama a `AnalizarMarcajes_GenerarInforme`.
 
 ---
 
-## 🚀 9. Próximas ampliaciones
-
-El proyecto está planificado para evolucionar en varias etapas:
-
-1. **Etapa actual (v1.0)**  
-   - Lectura de archivo externo  
-   - Análisis de marcajes  
-   - Generación de informes `.txt`
-
-2. **Etapa siguiente (v2.0)**  
-   - **Envío automático de correos** a los empleados detectados con ausencias.  
-     - Integración con Outlook mediante `CreateObject("Outlook.Application")`.  
-     - Envío del archivo generado como adjunto.  
-     - Registro de envíos exitosos.
-
-3. **Etapa avanzada (v3.0)**  
-   - Exportación en formato **PDF o Word (.docx)**.  
-   - Panel de control o formulario gráfico con calendario.  
-   - Registro histórico consolidado de ausencias.  
-   - Configuración personalizada de destinatarios y copia oculta (CC/BCC).
+## 6. Flujo de ejecución (paso a paso)
+1. Preparar archivo de marcajes y hoja `Empleados`.  
+2. Abrir libro `.xlsm` con macros.  
+3. Opcional: usar macro `CargarArchivoMarcajes` para importar marcajes (A1:F1 → D14..).  
+4. Ajustar configuración (`SMTP_USER`, `EMAIL_FROM`, `DryRun` si se desea).  
+5. Ejecutar `AnalizarMarcajes_Principal` (ALT+F8).  
+   - Si `SMTP_CDO`, la macro solicita App Password (no se guarda en código).  
+6. Revisar `Informe_Marcajes_*.txt` generado en la misma carpeta del workbook.  
+7. Si DryRun = True, la macro no envía correos; revisar informe y ajustar Empleados si es necesario.  
+8. Poner DryRun = False y volver a ejecutar para envío real (recomendar enviar por lotes en pruebas).
 
 ---
 
-## 🧠 10. Notas del autor
+## 7. Plantilla de asunto y cuerpo
+- Asunto:
+  ```
+  Recordatorio y Solicitud de Regularización de Marcaje de Asistencia - Jornada del dd/mm/yyyy
+  ```
+- Cuerpo (estructura generada por `BuildBody`):
+  ```
+  Estimada <Nombre>,
 
-- Este sistema fue desarrollado como parte de las **Prácticas Iniciales** de la carrera de **Ingeniería en Ciencias y Sistemas (USAC)**.  
-- El diseño busca ser **ligero, compatible y autónomo**, evitando dependencias externas.  
-- La documentación se ha elaborado cuidadosamente para que cualquier técnico o encargado pueda **instalar, ejecutar y diagnosticar errores** sin conocimientos avanzados de programación.  
-- Se recomienda mantener una **copia de respaldo** del archivo antes de cada prueba y registrar los resultados en un documento de control.
+  El presente correo tiene como finalidad informarle sobre una incidencia detectada en el registro de su marcaje de asistencia correspondiente a la <Jornada X> del día <08 de junio de 2025>.
+
+  Detalle del Registro Detectado:
+  ----------------------------------------
+  Hora Registrada
+  Entrada: 05:37
+  Salida: [Ausente]
+
+  Estado Detectado: Falta de registro de la hora de Salida.
+
+  Agradeceremos su colaboración para regularizar su marcaje a la brevedad posible, en caso de que corresponda una justificación o corrección de la hora de salida.
+
+  Por favor, siga el procedimiento interno establecido para realizar dicha regularización.
+
+  Agradecemos de antemano su atención y pronta gestión.
+
+  Atentamente,
+  Secretaría Académica
+  Facultad de Ingeniería
+  ```
+
+El texto se ajusta automáticamente a la fila actual (nombre, jornada, fecha, horas y estado).
 
 ---
 
-## 📅 Historial de versiones
-
-| Versión | Fecha | Descripción |
-|----------|--------|-------------|
-| 1.0 | 15/10/2025 | Versión inicial funcional. Análisis y generación automática de informes. |
-| 1.1 (planificada) | 10/2025 | Integración con Outlook para envío de correos. |
+## 8. Pruebas y modo seguro (DryRun)
+- Antes de enviar correos masivos, establecer `DryRun = True`.  
+- Ejecutar `AnalizarMarcajes_Principal`.  
+- Revisar el archivo `Informe_Marcajes_...txt`: validación de `EmailUsado`, `TipoMatch` y `EnvioResultado`.  
+- Si los matches sugeridos son correctos, pasar a `DryRun = False` y probar con 3-5 registros.
 
 ---
 
-✍️ **Documento redactado manualmente y revisado para uso institucional.**
+## 9. Gestión de credenciales (App Password)
+Recomendado: crear una cuenta Gmail dedicada para envíos automáticos.
+
+Pasos para App Password:
+1. Habilitar Verificación en dos pasos en la cuenta Gmail.  
+2. Acceder a https://myaccount.google.com/security → "Contraseñas de aplicaciones".  
+3. Crear una nueva contraseña para “Correo” o “Otro” y copiar la clave de 16 caracteres.  
+4. Al ejecutar la macro la primera vez (o cada ejecución si así lo desea), pegar la App Password cuando se solicite.  
+5. No almacenar la App Password en el código en texto plano. Opciones disponibles:
+   - Ingresar por `InputBox` cada ejecución (actual implementacion).
+   - Guardar en hoja oculta protegida (menos seguro) — se puede añadir si se requiere.
+
+Límites y advertencias:
+- Gmail impone límites de envío diario y por minuto. Para alto volumen, usar cuenta institucional o servicio de correo transaccional (SendGrid, Mailgun).
+
+---
+
+## 10. Registro e informe (auditoría)
+- Cada ejecución genera `Informe_Marcajes_YYYYMMDD_HHMMSS.txt` en la carpeta del workbook.  
+- El informe contiene:
+  - Nombre, fecha, jornada, horario esperado, marc-Ent, marc-Sal, estado, email usado, tipo match (Exacto/Sugerido/No encontrado), resultado del envío.  
+- Mantener estos informes archivados para auditoría.
+
+---
+
+## 11. Resolución de problemas comunes
+
+- Error 9 (Subscript out of range) en `Worksheets("Hoja1")`:  
+  - Verifique el nombre exacto de la pestaña. Use la macro `ListarNombresDeHojas` o renombre la pestaña.
+
+- Error al abrir archivo importado / Error 424:  
+  - El archivo seleccionado puede no ser un Excel válido o estar bloqueado. Cerrar el archivo en otras aplicaciones y reintentar.
+
+- No encuentra correo (EmailUsado vacío):  
+  - Revise coincidencia de nombres. Ejecute en `DryRun=True`.  
+  - Use la hoja `Empleados` con nombres completos. Si existe diferencia en tildes o acentos, la normalización las quita; sin embargo, si en `Empleados` los nombres tienen apellidos adicionales, el algoritmo usa token-matching y sugiere coincidencias. Revise `TipoMatch` en el informe.
+
+- Error SMTP/TLS al enviar:  
+  - Verifique App Password, puerto (465), acceso a internet, firewall que bloquee salida por ese puerto.  
+  - Si el equipo no soporta TLS moderno, considere usar un servidor SMTP institucional o API (SendGrid).
+
+- Correos marcados como SPAM:  
+  - Revisar `From`, configurar dominio remitente verificado o usar servicios transaccionales con autenticación (DKIM/SPF).
+
+---
+
+## 12. Buenas prácticas y seguridad
+- No guardar App Password en texto plano dentro del libro.  
+- Usar cuenta de correo dedicada para envíos automatizados.  
+- Ejecutar en modo DryRun antes de producción.  
+- Mantener informe por ejecución para trazabilidad.  
+- Si varios operadores usarán la macro: documentar proceso y permisos de ejecución (quién tiene acceso a App Password).  
+- Para volúmenes altos o mayor confiabilidad, migrar a una solución centralizada (script Python en servidor, Power Automate, o servicio de colas y envío).
+
+---
+
+## 13. Extensiones y mejoras futuras (sugeridas)
+- Almacenar histórico de envíos en hoja `EnviosHistorico` o base de datos (SQLite).  
+- Reemplazar matching por función Levenshtein para fuzzy matching más robusto.  
+- Implementar interfaz (UserForm) para ingresar App Password de forma segura (campo oculto).  
+- Integrar envío mediante API (SendGrid) para evitar problemas TLS/SMTP.  
+- Añadir reintentos y backoff en envíos fallidos.  
+- Crear versión con logging en tabla Excel además del TXT.
+
+---
+
+## Anexos rápidos
+
+### Cómo crear botones en Excel para ejecutar macros
+1. Pestaña **Desarrollador** → **Insertar** → Botón (Control de formulario).  
+2. Dibujar botón en la hoja.  
+3. Asignar macro `CargarArchivoMarcajes_Robusto` (si existe) o `AnalizarMarcajes_Principal` al botón.  
+4. Editar texto del botón con clic derecho → Editar texto.
+
+### Checklist rápido antes de enviar en producción
+- [ ] Copia de seguridad del libro (.xlsm) creada.  
+- [ ] `DryRun = True` verificado y ejecuciones de prueba realizadas.  
+- [ ] Coincidencias revisadas en informe y hoja `Empleados` corregida.  
+- [ ] App Password generado y probado.  
+- [ ] Límite de envíos de Gmail comprobado.  
+- [ ] Informes archivados para auditoría.
 
